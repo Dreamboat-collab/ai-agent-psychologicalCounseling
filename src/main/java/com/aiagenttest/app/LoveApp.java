@@ -1,12 +1,18 @@
 package com.aiagenttest.app;
 
+import com.aiagenttest.advisor.MyLoggerAdvisor;
+import com.aiagenttest.chatmemory.FileBasedChatMemory;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.InMemoryChatMemory;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -19,6 +25,9 @@ import static org.springframework.ai.chat.client.advisor.AbstractChatMemoryAdvis
 public class LoveApp {
 
     private final ChatClient chatClient;
+
+    @Resource
+    private VectorStore loveAppVectorStore;
 
     //定义健康报告
     public record HealthReport(String title, List<String> suggestions) {
@@ -40,15 +49,27 @@ public class LoveApp {
             + "2. 危机情况（如自伤倾向）立即提供专业援助渠道；"
             + "3. 避免诊断结论，强调‘非替代医疗建议’。";
 
-    public LoveApp(ChatModel dashscopeChatModel) {
-        // 初始化基于内存的对话记忆
-        ChatMemory chatMemory = new InMemoryChatMemory();
+//    public LoveApp(ChatModel dashscopeChatModel) {
+//        // 初始化基于内存的对话记忆
+//        ChatMemory chatMemory = new InMemoryChatMemory();
+//
+//        //初始化ChatClient
+//        chatClient = ChatClient.builder(dashscopeChatModel)
+//                .defaultSystem(SYSTEM_PROMPT)
+//                .defaultAdvisors(
+//                        new MessageChatMemoryAdvisor(chatMemory) //存储对话记忆
+//                )
+//                .build();
+//    }
 
-        //初始化ChatClient
+    public LoveApp(ChatModel dashscopeChatModel) {
+        // 初始化基于文件的对话记忆
+        String fileDir = System.getProperty("user.dir") + "/chat-memory";
+        ChatMemory chatMemory = new FileBasedChatMemory(fileDir);
         chatClient = ChatClient.builder(dashscopeChatModel)
                 .defaultSystem(SYSTEM_PROMPT)
                 .defaultAdvisors(
-                        new MessageChatMemoryAdvisor(chatMemory) //存储对话记忆
+                        new MessageChatMemoryAdvisor(chatMemory)
                 )
                 .build();
     }
@@ -93,5 +114,42 @@ public class LoveApp {
                 .entity(HealthReport.class);
         return report;
     }
+
+    // 使用RAG知识库进行对话的方法
+//    public String doChatWithRag(String message, String chatId) {
+//        ChatResponse response = chatClient
+//                .prompt()
+//                .user(message)
+//                .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId) //指定对话id
+//                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10)) //指定历史消息的数量，10条，添加到当前会话的提示词中
+//                .advisors(new QuestionAnswerAdvisor(loveAppVectorStore)) // 参数为向量数据库，基于知识库进行问答
+//                .call()
+//                .chatResponse();
+//        String content = response.getResult().getOutput().getText();
+//        System.out.println(content);
+//        return content;
+//    }
+
+
+    @Resource
+    private Advisor loveAppRagCloudAdvisor;
+    // 基于云知识库进行问答
+    public String doChatWithRag(String message, String chatId) {
+        ChatResponse chatResponse = chatClient
+                .prompt()
+                .user(message)
+                .advisors(spec -> spec.param(CHAT_MEMORY_CONVERSATION_ID_KEY, chatId)
+                        .param(CHAT_MEMORY_RETRIEVE_SIZE_KEY, 10))
+                // 开启日志，便于观察效果
+                .advisors(new MyLoggerAdvisor())
+                // 应用增强检索服务（云知识库服务）
+                .advisors(loveAppRagCloudAdvisor)
+                .call()
+                .chatResponse();
+        String content = chatResponse.getResult().getOutput().getText();
+        log.info("content: {}", content);
+        return content;
+    }
+
 }
 

@@ -46,5 +46,14 @@ class LoveAppTest {
         System.out.println(Report);
         Assertions.assertNotNull(Report);
     }
+
+    // 测试RAG效果
+    @Test
+    void doChatWithRag() {
+        String chatId = UUID.randomUUID().toString();
+        String message = "睡眠不足会影响心理健康吗？";
+        String answer =  loveApp.doChatWithRag(message, chatId);
+        Assertions.assertNotNull(answer);
+    }
 }
 
