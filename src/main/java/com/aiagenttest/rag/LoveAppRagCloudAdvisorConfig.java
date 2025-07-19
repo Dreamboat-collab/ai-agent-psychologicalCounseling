@@ -28,6 +28,9 @@ class LoveAppRagCloudAdvisorConfig {
         DocumentRetriever documentRetriever = new DashScopeDocumentRetriever(dashScopeApi,
                 DashScopeDocumentRetrieverOptions.builder()
                         .withIndexName(KNOWLEDGE_INDEX)
+                        .withDenseSimilarityTopK(5)  // 主要的数量控制
+                        .withRerankTopN(3)           // 最终返回3个最相关的
+                        .withEnableReranking(true)   // 启用重排序
                         .build());
         return RetrievalAugmentationAdvisor.builder()
                 .documentRetriever(documentRetriever)

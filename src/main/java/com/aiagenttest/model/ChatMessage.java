@@ -47,7 +47,7 @@ public class ChatMessage implements Serializable {
     private String content;
 
     /**
-     * 元数据
+     * 元数据（用于区分是用户消息还是AI回复消息）
      */
     @TableField(value = "metadata", typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> metadata;
